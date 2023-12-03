@@ -28,6 +28,35 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
+// API endpoint to insert data into the Supabase table
+app.post('/api/data', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('locations').insert(req.body);
+    if (error) {
+      throw error;
+    }
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API get location from id
+app.get('/api/location/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('id', req.params.id);
+    if (error) {
+      throw error;
+    }
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });

@@ -9,21 +9,113 @@
 
 <h1>New location helper</h1>
 
-<button onclick="fetchData()">Start</button>
+<div style="display: flex; height: 100vh; flex-direction: column; width: 50%;">
+  <button id="start-button" onclick="fetchData()">Start</button>
 
-<div id="output"></div>
+  <form style="display: flex; flex-direction: column; display: none; align-items: flex-start;" onsubmit="next()">
+    <div style="border: 1px dashed black; width: max-content;">
+      <span id="number"></span>
+    </div>
+    <div class="">
+      id: <span id="id"></span>
+    </div>
+    <div class="">
+      created_at: <span id="created_at"></span>
+    </div>
+
+    <label for="name">name</label>
+    <input id="name" type="text">
+
+    <label for="security">security</label>
+    <select id="security">
+      <option value="GOUND_ANCHOR">GOUND_ANCHOR</option>
+      <option value="LOCKING_RAIL">LOCKING_RAIL</option>
+      <option value="NONE">NONE</option>
+    </select>
+
+    <label for="size">size</label>
+    <select name="size" id="cars">
+      <option value="XS">XS</option>
+      <option value="SM">SM</option>
+      <option value="MD">MD</option>
+      <option value="LG">LG</option>
+      <option value="XL">XL</option>
+    </select>
+
+    <label for="type">type</label>
+    <select id="type">
+      <option value="on_pavement">on_pavement</option>
+      <option value="cafe_meetup">cafe_meetup</option>
+      <option value="beautiful_spot">beautiful_spot</option>
+      <option value="off_road">off_road</option>
+      <option value="bay">bay</option>
+    </select>
+
+    <label for="cost">cost</label>
+    <select name="cost" id="cost">
+      <option value="volvo">free</option>
+      <option value="saab">paid</option>
+      <option value="">unknown</option>
+    </select>
+
+    <div id="update-location"></div>
+
+    <button type="submit">next</button>
+  </form>
+
+  <span id="error" style="color: red;"></span>
+</div>
 
 <script>
+  let locations = undefined;
+  let index = 0;
+  let total = 0;
+
+  async function next() {
+    index++;
+    if (index >= locations.length) {
+      index = 0;
+    }
+    document.getElementById('number').innerText = index + ' / ' + total;
+    const location = locations[index];
+    console.log(location);
+    document.getElementById('id').innerText = location.id;
+    document.getElementById('created_at').innerText = location.created_at;
+    document.getElementById('name').value = location.name;
+    document.getElementById('security').value = location.security;
+    document.getElementById('size').value = location.size;
+    document.getElementById('type').value = location.type;
+    document.getElementById('cost').value = location.cost;
+
+    if (location.location_id) {
+      try {
+        const location = await fetch('/api/location/' + location.location_id);
+        const locationData = await location.json();
+        document.getElementById('output').innerText = JSON.stringify(location, null, 2);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('error').innerHTML = error.message;
+      }
+    } else {
+      document.getElementById('update-location').innerHTML = '';
+    }
+  }
+
   async function fetchData() {
     try {
       const response = await fetch('/api/data');
-      const data = await response.json();
-
-      // Update the output element with the fetched data
-      document.getElementById('output').innerText = JSON.stringify(data, null, 2);
+      locations = await response.json();
+      total = locations.length;
     } catch (error) {
-      console.error('Error fetching data:', error.message);
+      console.error(error);
+      document.getElementById('error').innerHTML = error.message;
     }
+
+    document.getElementById('start-button').remove();
+    document.querySelector('form').style.display = 'flex';
+
+    // set the first location
+    next();
   }
 </script>
 
