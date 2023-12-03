@@ -5,36 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>New location helper</title>
 </head>
-<body>
+<body style="font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
 
-<h1>New location helper</h1>
+<h1 style="color: #333; margin-bottom: 20px; text-align: center;">New location helper</h1>
 
-<div style="display: flex; height: 100vh; flex-direction: column; width: 50%;">
-  <button id="start-button" onclick="fetchData()">Start</button>
+<div style="display: flex; flex-direction: column; width: 50%; margin: auto; padding: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
 
-  <form style="display: flex; flex-direction: column; display: none; align-items: flex-start;" onsubmit="next()">
-    <div style="border: 1px dashed black; width: max-content;">
-      <span id="number"></span>
-    </div>
-    <div class="">
-      id: <span id="id"></span>
-    </div>
-    <div class="">
-      created_at: <span id="created_at"></span>
-    </div>
+  <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer;" id="start-button" onclick="fetchData()">Start</button>
 
-    <label for="name">name</label>
-    <input id="name" type="text">
+  <form style="display: flex; flex-direction: column; align-items: flex-start; display: none; margin-top: 20px;">
 
-    <label for="security">security</label>
-    <select id="security">
+    <div style="border: 1px dashed black; width: max-content; padding: 5px; margin-bottom: 10px;" id="number"></div>
+
+    <div style="margin-bottom: 10px;"><label style="font-weight: bold;" for="id">ID:</label> <span id="id"></span></div>
+    <div style="margin-bottom: 10px;"><label style="font-weight: bold;" for="created_at">Created At:</label> <span id="created_at"></span></div>
+
+    <label style="margin-top: 10px; font-weight: bold;" for="name">Name</label>
+    <input style="margin-bottom: 10px; padding: 8px;" id="name" type="text">
+
+    <label style="margin-top: 10px; font-weight: bold;" for="security">Security</label>
+    <select style="margin-bottom: 10px; padding: 8px;" id="security">
       <option value="GOUND_ANCHOR">GOUND_ANCHOR</option>
       <option value="LOCKING_RAIL">LOCKING_RAIL</option>
       <option value="NONE">NONE</option>
     </select>
 
-    <label for="size">size</label>
-    <select name="size" id="cars">
+    <label style="margin-top: 10px; font-weight: bold;" for="size">Size</label>
+    <select style="margin-bottom: 10px; padding: 8px;" name="size" id="cars">
       <option value="XS">XS</option>
       <option value="SM">SM</option>
       <option value="MD">MD</option>
@@ -42,8 +39,8 @@
       <option value="XL">XL</option>
     </select>
 
-    <label for="type">type</label>
-    <select id="type">
+    <label style="margin-top: 10px; font-weight: bold;" for="type">Type</label>
+    <select style="margin-bottom: 10px; padding: 8px;" id="type">
       <option value="on_pavement">on_pavement</option>
       <option value="cafe_meetup">cafe_meetup</option>
       <option value="beautiful_spot">beautiful_spot</option>
@@ -51,8 +48,8 @@
       <option value="bay">bay</option>
     </select>
 
-    <label for="cost">cost</label>
-    <select name="cost" id="cost">
+    <label style="margin-top: 10px; font-weight: bold;" for="cost">Cost</label>
+    <select style="margin-bottom: 10px; padding: 8px;" name="cost" id="cost">
       <option value="volvo">free</option>
       <option value="saab">paid</option>
       <option value="">unknown</option>
@@ -60,10 +57,10 @@
 
     <div id="update-location"></div>
 
-    <button type="submit">next</button>
+    <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer;" type="button" onclick="next()">Next</button>
   </form>
 
-  <span id="error" style="color: red;"></span>
+  <span style="color: red; margin-top: 10px;" id="error"></span>
 </div>
 
 <script>
@@ -78,14 +75,28 @@
     }
     document.getElementById('number').innerText = index + ' / ' + total;
     const location = locations[index];
+    // Parse and format the date
+    const parsedDate = new Date(location.created_at);
+    const formattedDate = parsedDate.toLocaleString();
+
     console.log(location);
     document.getElementById('id').innerText = location.id;
-    document.getElementById('created_at').innerText = location.created_at;
+    document.getElementById('created_at').innerText = formattedDate;
     document.getElementById('name').value = location.name;
     document.getElementById('security').value = location.security;
-    document.getElementById('size').value = location.size;
+    // document.getElementById('size').value = location?.size || undefined;
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
+
+    // open in google maps
+    const latlonArray = JSON.parse(location.latlon);
+    const [latitude, longitude] = latlonArray;
+
+    if (latitude !== undefined && longitude !== undefined) {
+      const latlon = `${latitude},${longitude}`;
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${latlon}`;
+      window.open(googleMapsUrl, '_blank');
+    }
 
     if (location.location_id) {
       try {
