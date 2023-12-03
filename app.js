@@ -1,10 +1,14 @@
 const express = require('express');
+const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
 
 require('dotenv').config();
 
 const app = express();
 const port = 3000;
+
+// create application/json parser
+var jsonParser = bodyParser.json();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -29,14 +33,15 @@ app.get('/api/data', async (req, res) => {
 });
 
 // API endpoint to insert data into the Supabase table
-app.post('/api/data', async (req, res) => {
+app.post('/api/data', jsonParser, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('locations').insert(req.body);
+    const { data, error } = await supabase.from('test_table').insert({});
     if (error) {
       throw error;
     }
     res.json(data);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -9,7 +9,7 @@
 
 <h1 style="color: #333; margin-bottom: 20px; text-align: center;">New location helper</h1>
 
-<div style="display: flex; flex-direction: column; width: 50%; margin: auto; padding: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+<div style="display: flex; flex-direction: column; width: 50%; margin: auto; padding: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); justify-content: center;">
 
   <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer;" id="start-button" onclick="fetchData()">Start</button>
 
@@ -31,7 +31,7 @@
     </select>
 
     <label style="margin-top: 10px; font-weight: bold;" for="size">Size</label>
-    <select style="margin-bottom: 10px; padding: 8px;" name="size" id="cars">
+    <select style="margin-bottom: 10px; padding: 8px;" name="size" id="size">
       <option value="XS">XS</option>
       <option value="SM">SM</option>
       <option value="MD">MD</option>
@@ -50,14 +50,17 @@
 
     <label style="margin-top: 10px; font-weight: bold;" for="cost">Cost</label>
     <select style="margin-bottom: 10px; padding: 8px;" name="cost" id="cost">
-      <option value="volvo">free</option>
-      <option value="saab">paid</option>
+      <option value="free">free</option>
+      <option value="paid">paid</option>
       <option value="">unknown</option>
     </select>
 
     <div id="update-location"></div>
 
-    <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer;" type="button" onclick="next()">Next</button>
+    <div style="display: flex;">
+      <button style="background-color: red; color: #fff; padding: 10px; border: none; cursor: pointer;" type="button" onclick="deleteLocation()">Delete</button>
+      <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="addLocation()">Add</button>
+    </div>
   </form>
 
   <span style="color: red; margin-top: 10px;" id="error"></span>
@@ -84,7 +87,7 @@
     document.getElementById('created_at').innerText = formattedDate;
     document.getElementById('name').value = location.name;
     document.getElementById('security').value = location.security;
-    // document.getElementById('size').value = location?.size || undefined;
+    document.getElementById('size').value = location.size || null;
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
 
@@ -102,7 +105,7 @@
       try {
         const location = await fetch('/api/location/' + location.location_id);
         const locationData = await location.json();
-        document.getElementById('output').innerText = JSON.stringify(location, null, 2);
+        document.getElementById('update-location').innerText = JSON.stringify(location, null, 2);
       } catch (error) {
         console.error(error);
         document.getElementById('error').innerHTML = error.message;
@@ -127,6 +130,35 @@
 
     // set the first location
     next();
+  }
+
+  async function addLocation() {
+    const confirmAdd = confirm("Are you sure you want to add this location?");
+    if (confirmAdd) {
+      const updatedLocation = {
+        name: document.getElementById('name').value,
+        security: document.getElementById('security').value,
+        size: document.getElementById('size').value,
+        type: document.getElementById('type').value,
+        cost: document.getElementById('cost').value,
+      };
+      try {
+        console.log({updatedLocation})
+        const response = await fetch('/api/data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedLocation),
+        });
+        const result = await response.json();
+        alert(result?.message || 'new location added!');
+        next(); // go to the next location
+      } catch (error) {
+        console.error(error);
+        document.getElementById('error').innerHTML = error.message;
+      }
+    }
   }
 </script>
 
