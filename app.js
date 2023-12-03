@@ -16,7 +16,9 @@ app.use(express.static('public')); // Serve static files from the 'public' direc
 // API endpoint to fetch data from the Supabase table
 app.get('/api/data', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('your_table_name').select('*');
+    const { data, error } = await supabase
+      .from('location_requests')
+      .select('*');
     if (error) {
       throw error;
     }
