@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Node.js App</title>
+</head>
+<body>
+
+<h1>Supabase Node.js App</h1>
+
+<button onclick="fetchData()">Fetch Data</button>
+
+<div id="output"></div>
+
+<script>
+  async function fetchData() {
+    try {
+      const response = await fetch('/api/data');
+      const data = await response.json();
+
+      // Update the output element with the fetched data
+      document.getElementById('output').innerText = JSON.stringify(data, null, 2);
+    } catch (error) {
+      console.error('Error fetching data:', error.message);
+    }
+  }
+</script>
+
+</body>
+</html>
