@@ -67,6 +67,7 @@
       <button id="add-update-button" style="background-color: green; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="addLocation()">Add</button>
       <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="next()">next</button>
     </div>
+    <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer; margin-top: 10px;" type="button" onclick="openInGoogleMaps()">Open in Google Maps</button>
   </form>
 
   <span style="color: red; margin-top: 10px;" id="error"></span>
@@ -76,6 +77,15 @@
   let locations = undefined;
   let index = 0;
   let total = 0;
+
+  function openInGoogleMaps() {
+    const latlonArray = JSON.parse(locations[index].latlon);
+    const [latitude, longitude] = latlonArray;
+
+    if (latitude !== undefined && longitude !== undefined) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+    }
+  }
 
   async function next() {
     index++;
@@ -97,17 +107,11 @@
     document.getElementById('size').value = location.size || null;
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
-    document.getElementById('latlon').value = location.latlon;
+    document.getElementById('latlon').value = location.latlon.substring(1, location.latlon.length-1);
 
     // open in google maps
     const latlonArray = JSON.parse(location.latlon);
     const [latitude, longitude] = latlonArray;
-
-    if (latitude !== undefined && longitude !== undefined) {
-      const latlon = `${latitude},${longitude}`;
-      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${latlon}`;
-      window.open(googleMapsUrl, '_blank');
-    }
 
     if (location.location_id) {
       // update the button text
@@ -151,7 +155,6 @@
           method: 'DELETE',
         });
         const result = await response.json();
-        alert(result?.message || 'location deleted!');
         next(); // go to the next location
       } catch (error) {
         console.error(error);
@@ -182,7 +185,6 @@
           body: JSON.stringify(updatedLocation),
         });
         const result = await response.json();
-        alert(result?.message || 'new location added!');
       } catch (error) {
         console.error(error);
         document.getElementById('error').innerHTML = error.message;
