@@ -20,6 +20,9 @@
     <div style="margin-bottom: 10px;"><label style="font-weight: bold;" for="id">ID:</label> <span id="id"></span></div>
     <div style="margin-bottom: 10px;"><label style="font-weight: bold;" for="created_at">Created At:</label> <span id="created_at"></span></div>
 
+    <label style="margin-top: 10px; font-weight: bold;" for="latlon">Latlon</label>
+    <input style="margin-bottom: 10px; padding: 8px;" id="latlon" type="text">
+
     <label style="margin-top: 10px; font-weight: bold;" for="name">Name</label>
     <input style="margin-bottom: 10px; padding: 8px;" id="name" type="text">
 
@@ -28,6 +31,7 @@
       <option value="GOUND_ANCHOR">GOUND_ANCHOR</option>
       <option value="LOCKING_RAIL">LOCKING_RAIL</option>
       <option value="NONE">NONE</option>
+      <option value="">Unknown</option>
     </select>
 
     <label style="margin-top: 10px; font-weight: bold;" for="size">Size</label>
@@ -55,11 +59,13 @@
       <option value="">unknown</option>
     </select>
 
-    <div id="update-location"></div>
+    <label style="margin-top: 10px; font-weight: bold;" for="update-location">Update location:</label>
+    <pre id="update-location"></pre>
 
     <div style="display: flex;">
       <button style="background-color: red; color: #fff; padding: 10px; border: none; cursor: pointer;" type="button" onclick="deleteLocation()">Delete</button>
-      <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="addLocation()">Add</button>
+      <button id="add-update-button" style="background-color: green; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="addLocation()">Add</button>
+      <button style="background-color: #3498db; color: #fff; padding: 10px; border: none; cursor: pointer; margin-left: 10px;" type="button" onclick="next()">next</button>
     </div>
   </form>
 
@@ -73,6 +79,7 @@
 
   async function next() {
     index++;
+    document.getElementById('error').innerHTML = '';
     if (index >= locations.length) {
       index = 0;
     }
@@ -90,6 +97,7 @@
     document.getElementById('size').value = location.size || null;
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
+    document.getElementById('latlon').value = location.latlon;
 
     // open in google maps
     const latlonArray = JSON.parse(location.latlon);
@@ -102,15 +110,18 @@
     }
 
     if (location.location_id) {
+      // update the button text
+      document.getElementById('add-update-button').innerText = 'Update';
+
       try {
-        const location = await fetch('/api/location/' + location.location_id);
-        const locationData = await location.json();
-        document.getElementById('update-location').innerText = JSON.stringify(location, null, 2);
+        const locationToUpdate = await fetch('/api/location/' + location.location_id);
+        document.getElementById('update-location').innerText = JSON.stringify(await locationToUpdate.json(), null, 2);
       } catch (error) {
         console.error(error);
         document.getElementById('error').innerHTML = error.message;
       }
     } else {
+      document.getElementById('add-update-button').innerText = 'Add';
       document.getElementById('update-location').innerHTML = '';
     }
   }
@@ -132,6 +143,23 @@
     next();
   }
 
+  async function deleteLocation() {
+    const confirmDelete = confirm("Are you sure you want to delete this location request?");
+    if (confirmDelete) {
+      try {
+        const response = await fetch('/api/location/' + locations[index].id, {
+          method: 'DELETE',
+        });
+        const result = await response.json();
+        alert(result?.message || 'location deleted!');
+        next(); // go to the next location
+      } catch (error) {
+        console.error(error);
+        document.getElementById('error').innerHTML = error.message;
+      }
+    }
+  }
+
   async function addLocation() {
     const confirmAdd = confirm("Are you sure you want to add this location?");
     if (confirmAdd) {
@@ -141,11 +169,13 @@
         size: document.getElementById('size').value,
         type: document.getElementById('type').value,
         cost: document.getElementById('cost').value,
+        latlon: document.getElementById('latlon').value,
       };
       try {
-        console.log({updatedLocation})
-        const response = await fetch('/api/data', {
-          method: 'POST',
+        const endPoint = locations[index].location_id ? `/api/data/${locations[index].location_id}` : '/api/data';
+        method = locations[index].location_id ? 'PUT' : 'POST';
+        const response = await fetch(endPoint, {
+          method,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -153,7 +183,6 @@
         });
         const result = await response.json();
         alert(result?.message || 'new location added!');
-        next(); // go to the next location
       } catch (error) {
         console.error(error);
         document.getElementById('error').innerHTML = error.message;

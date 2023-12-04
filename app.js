@@ -35,7 +35,34 @@ app.get('/api/data', async (req, res) => {
 // API endpoint to insert data into the Supabase table
 app.post('/api/data', jsonParser, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('test_table').insert({});
+    const { data, error } = await supabase.from('location').insert({
+      ...req.body,
+      security: req.body.security || null,
+      user_added: true,
+    });
+    if (error) {
+      throw error;
+    }
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/data/:id', jsonParser, async (req, res) => {
+  delete req.body.id;
+  delete req.body.latlon;
+  console.log('id', req.params.id);
+  try {
+    const { data, error } = await supabase
+      .from('location')
+      .update({
+        ...req.body,
+        security: req.body.security || null,
+        user_added: true,
+      })
+      .eq('id', req.params.id);
     if (error) {
       throw error;
     }
@@ -50,8 +77,25 @@ app.post('/api/data', jsonParser, async (req, res) => {
 app.get('/api/location/:id', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('locations')
+      .from('location')
       .select('*')
+      .eq('id', req.params.id);
+    if (error) {
+      console.log(error);
+      throw error;
+    }
+    res.json(data[0]);
+  } catch (error) {
+    res.statusMessage = error.message;
+    res.status(500);
+  }
+});
+
+app.delete('/api/location/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('location_requests')
+      .delete()
       .eq('id', req.params.id);
     if (error) {
       throw error;
