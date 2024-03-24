@@ -131,6 +131,12 @@
 </div>
 
 <script>
+  // check for auth token
+  const authToken = localStorage.getItem('authToken');
+  if (!authToken) {
+    window.location.href = '/login';
+  }
+
   let locations = undefined;
   let index = 0;
   let total = 0;
@@ -249,6 +255,7 @@
       }
     }
   }
+
 </script>
 
 </body>
