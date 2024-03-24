@@ -113,3 +113,18 @@ app.delete('/api/location/:id', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+app.post('/login', jsonParser, async (req, res) => {
+  console.log(req.body);
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: req.body.email,
+    password: req.body.password,
+  });
+
+  if (error) {
+    console.error(error);
+    res.status(401).json({ error: error.message });
+  } else {
+    res.json(data);
+  }
+});
