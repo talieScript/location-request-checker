@@ -17,6 +17,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(express.static('public')); // Serve static files from the 'public' directory
 
+app.get('/login', function (req, res) {
+  res.sendFile(__dirname + '/public/login.html');
+});
+
 // API endpoint to fetch data from the Supabase table
 app.get('/api/data', async (req, res) => {
   try {
