@@ -132,8 +132,8 @@
 
 <script>
   // check for auth token
-  const authToken = localStorage.getItem('authToken');
-  if (!authToken) {
+  const accessToken = localStorage.getItem('accessToken');
+  if (!accessToken) {
     window.location.href = '/login';
   }
 
