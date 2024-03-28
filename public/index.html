@@ -196,6 +196,17 @@
   async function fetchData() {
     try {
       const response = await fetch('/api/data');
+      if (!response.ok) {
+        const message = `An error has occurred: ${response.status}`;
+        if(response.status === 401) {
+          let isConfirmed = confirm(message);
+          if (isConfirmed) {
+            window.location.href = '/login';
+          }
+          return;
+        }
+        throw new Error(message);
+      }
       locations = await response.json();
       total = locations.length;
     } catch (error) {
