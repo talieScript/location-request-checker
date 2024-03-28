@@ -17,12 +17,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(express.static('public')); // Serve static files from the 'public' directory
 
-app.get('/login', function (req, res) {
+app.get('/login', async function (req, res) {
   res.sendFile(__dirname + '/public/login.html');
 });
 
 app.post('/login', jsonParser, async (req, res) => {
-  console.log(req.body);
   const { data, error } = await supabase.auth.signInWithPassword({
     email: req.body.email,
     password: req.body.password,
@@ -37,7 +36,14 @@ app.post('/login', jsonParser, async (req, res) => {
 });
 
 // API endpoint to fetch data from the Supabase table
-app.get('/api/data', async (req, res) => {
+app.get('/api/data', async (res) => {
+  const sessionData = await supabase.auth.getSession();
+
+  if (!sessionData.data.session) {
+    res.status(401).json({ error: 'Not logged in' });
+    return;
+  }
+
   try {
     const { data, error } = await supabase
       .from('location_requests')
