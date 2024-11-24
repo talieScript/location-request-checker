@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Page</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .container {
+      width: 300px;
+      padding: 16px;
+      background-color: white;
+      margin: 0 auto;
+      margin-top: 100px;
+      border: 1px solid black;
+      border-radius: 4px;
+    }
+    input[type=text], input[type=password] {
+      padding: 15px;
+      margin: 5px 0 22px 0;
+      display: inline-block;
+      border: none;
+      background: #f1f1f1;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 14px 20px;
+      margin: 8px 0;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      opacity: 0.9;
+    }
+    button:hover {
+      opacity:1;
+    }
+  </style>
+</head>
+<body>
+  <h2>Login Page</h2>
+  <form action="/login" method="post">
+    <div class="container">
+      <label for="uname"><b>Username</b></label>
+      <input type="text" placeholder="Enter Username" name="uname" required>
+
+      <label for="psw"><b>Password</b></label>
+      <input type="password" placeholder="Enter Password" name="psw" required>
+
+      <button type="submit">Login</button>
+    </div>
+  </form>
+
+  <script>
+    document.querySelector('form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.querySelector('input[name="uname"]').value;
+      const password = document.querySelector('input[name="psw"]').value;
+      fetch('/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          alert(data.error);
+        } else {
+          localStorage.setItem('accessToken', data.session.access_token);
+          localStorage.setItem('user', data.user.id);
+          window.location.href = '/';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
