@@ -1,6 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
+const serverless = require('serverless-http');
+const router = express.Router();
 
 require('dotenv').config();
 
@@ -153,6 +155,5 @@ app.delete('/api/location/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+app.use('/.netlify/functions/api', router);
+module.exports.handler = serverless(app);
