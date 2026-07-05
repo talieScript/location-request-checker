@@ -57,6 +57,14 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
+function formatLatlonForLocation(latlon) {
+  const trimmed = String(latlon).trim();
+  if (trimmed.startsWith('[')) {
+    return JSON.parse(trimmed).join(',');
+  }
+  return trimmed.replace(/[\[\]]/g, '');
+}
+
 // API endpoint to insert data into the Supabase table
 app.post('/api/data', jsonParser, async (req, res) => {
   const sessionData = await supabase.auth.getSession();
@@ -69,6 +77,7 @@ app.post('/api/data', jsonParser, async (req, res) => {
   try {
     const { data, error } = await supabase.from('location').insert({
       ...req.body,
+      latlon: formatLatlonForLocation(req.body.latlon),
       security: req.body.security || null,
       user_added: true,
       reviewer: sessionData.data.session.user.id,

@@ -141,6 +141,14 @@
   let index = 0;
   let total = 0;
 
+  function formatLatlonForInput(latlon) {
+    const trimmed = latlon.trim();
+    if (trimmed.startsWith('[')) {
+      return JSON.parse(trimmed).join(',');
+    }
+    return trimmed;
+  }
+
   function openInGoogleMaps() {
     const latlonArray = JSON.parse(locations[index].latlon);
     const [latitude, longitude] = latlonArray;
@@ -170,7 +178,7 @@
     document.getElementById('size').value = location.size || null;
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
-    document.getElementById('latlon').value = location.latlon.substring(1, location.latlon.length-1);
+    document.getElementById('latlon').value = formatLatlonForInput(location.latlon);
 
     // open in google maps
     const latlonArray = JSON.parse(location.latlon);
@@ -246,7 +254,7 @@
         size: document.getElementById('size').value,
         type: document.getElementById('type').value,
         cost: document.getElementById('cost').value,
-        latlon: document.getElementById('latlon').value,
+        latlon: formatLatlonForInput(document.getElementById('latlon').value),
       };
       try {
         const endPoint = locations[index].location_id ? `/api/data/${locations[index].location_id}` : '/api/data';
