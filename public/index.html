@@ -26,7 +26,7 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       justify-content: center;
     }
-    .start-button, .delete-button, .add-button, .skip-button, .open-button {
+    .start-button, .delete-button, .add-button, .skip-button, .back-button, .open-button {
       background-color: #3498db;
       color: #fff;
       padding: 10px;
@@ -122,6 +122,7 @@
     <div>
       <button class="delete-button" type="button" onclick="deleteLocation()">Delete location request</button>
       <button id="add-update-button" class="add-button" type="button" onclick="addLocation()">Add location to map</button>
+      <button class="back-button" type="button" onclick="back()">Back</button>
       <button class="skip-button" type="button" onclick="next()">Skip</button>
     </div>
     <button class="open-button" type="button" onclick="openInGoogleMaps()">Open in Google Maps</button>
@@ -141,6 +142,19 @@
   let index = 0;
   let total = 0;
 
+  function handleUnauthorized() {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+
+  function authHeaders(extra = {}) {
+    return {
+      ...extra,
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+
   function formatLatlonForInput(latlon) {
     const trimmed = latlon.trim();
     if (trimmed.startsWith('[')) {
@@ -158,12 +172,24 @@
     }
   }
 
+  async function back() {
+    index--;
+    if (index < 0) {
+      index = locations.length - 1;
+    }
+    await showLocation();
+  }
+
   async function next() {
     index++;
-    document.getElementById('error').innerHTML = '';
     if (index >= locations.length) {
       index = 0;
     }
+    await showLocation();
+  }
+
+  async function showLocation() {
+    document.getElementById('error').innerHTML = '';
     document.getElementById('number').innerText = index + ' / ' + total;
     const location = locations[index];
     // Parse and format the date
@@ -189,7 +215,9 @@
       document.getElementById('add-update-button').innerText = 'Update existing location on map';
 
       try {
-        const locationToUpdate = await fetch('/api/location/' + location.location_id);
+        const locationToUpdate = await fetch('/api/location/' + location.location_id, {
+          headers: authHeaders(),
+        });
         document.getElementById('update-location').innerText = JSON.stringify(await locationToUpdate.json(), null, 2);
       } catch (error) {
         console.error(error);
@@ -203,14 +231,13 @@
 
   async function fetchData() {
     try {
-      const response = await fetch('/api/data');
+      const response = await fetch('/api/data', {
+        headers: authHeaders(),
+      });
       if (!response.ok) {
         const message = `An error has occurred: ${response.status}`;
-        if(response.status === 401) {
-          let isConfirmed = confirm(message);
-          if (isConfirmed) {
-            window.location.href = '/login';
-          }
+        if (response.status === 401) {
+          handleUnauthorized();
           return;
         }
         throw new Error(message);
@@ -235,6 +262,7 @@
       try {
         const response = await fetch('/api/location/' + locations[index].id, {
           method: 'DELETE',
+          headers: authHeaders(),
         });
         const result = await response.json();
         next(); // go to the next location
@@ -261,9 +289,9 @@
         method = locations[index].location_id ? 'PUT' : 'POST';
         const response = await fetch(endPoint, {
           method,
-          headers: {
+          headers: authHeaders({
             'Content-Type': 'application/json',
-          },
+          }),
           body: JSON.stringify(updatedLocation),
         });
         const result = await response.json();

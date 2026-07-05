@@ -15,6 +15,53 @@ const supabaseKey = process.env.SUPABASE_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+function getAccessToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.slice(7);
+}
+
+function createAuthenticatedClient(accessToken) {
+  return createClient(supabaseUrl, supabaseKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+async function getAuthenticatedClient(req, res) {
+  const accessToken = getAccessToken(req);
+  if (!accessToken) {
+    res.status(401).json({ error: 'Not logged in' });
+    return null;
+  }
+
+  const client = createAuthenticatedClient(accessToken);
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user) {
+    res.status(401).json({ error: 'Not logged in' });
+    return null;
+  }
+
+  return { client, user };
+}
+
+function formatLatlonForLocation(latlon) {
+  const trimmed = String(latlon).trim();
+  if (trimmed.startsWith('[')) {
+    return JSON.parse(trimmed).join(',');
+  }
+  return trimmed.replace(/[\[\]]/g, '');
+}
+
 app.use(express.static('public')); // Serve static files from the 'public' directory
 
 app.get('/login', async function (req, res) {
@@ -37,15 +84,13 @@ app.post('/login', jsonParser, async (req, res) => {
 
 // API endpoint to fetch data from the Supabase table
 app.get('/api/data', async (req, res) => {
-  const sessionData = await supabase.auth.getSession();
-
-  if (!sessionData.data.session) {
-    res.status(401).json({ error: 'Not logged in' });
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
     return;
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('location_requests')
       .select('*');
     if (error) {
@@ -57,30 +102,20 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
-function formatLatlonForLocation(latlon) {
-  const trimmed = String(latlon).trim();
-  if (trimmed.startsWith('[')) {
-    return JSON.parse(trimmed).join(',');
-  }
-  return trimmed.replace(/[\[\]]/g, '');
-}
-
 // API endpoint to insert data into the Supabase table
 app.post('/api/data', jsonParser, async (req, res) => {
-  const sessionData = await supabase.auth.getSession();
-
-  if (!sessionData.data.session) {
-    res.status(401).json({ error: 'Not logged in' });
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
     return;
   }
 
   try {
-    const { data, error } = await supabase.from('location').insert({
+    const { data, error } = await auth.client.from('location').insert({
       ...req.body,
       latlon: formatLatlonForLocation(req.body.latlon),
       security: req.body.security || null,
       user_added: true,
-      reviewer: sessionData.data.session.user.id,
+      reviewer: auth.user.id,
     });
     if (error) {
       throw error;
@@ -93,23 +128,21 @@ app.post('/api/data', jsonParser, async (req, res) => {
 });
 
 app.put('/api/data/:id', jsonParser, async (req, res) => {
-  const sessionData = await supabase.auth.getSession();
-
-  if (!sessionData.data.session) {
-    res.status(401).json({ error: 'Not logged in' });
-    return null;
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
+    return;
   }
 
   delete req.body.id;
   delete req.body.latlon;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('location')
       .update({
         ...req.body,
         security: req.body.security || null,
         user_added: true,
-        reviewer: sessionData.data.session.user.id,
+        reviewer: auth.user.id,
       })
       .eq('id', req.params.id);
     if (error) {
@@ -124,8 +157,13 @@ app.put('/api/data/:id', jsonParser, async (req, res) => {
 
 // API get location from id
 app.get('/api/location/:id', async (req, res) => {
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
+    return;
+  }
+
   try {
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('location')
       .select('*')
       .eq('id', req.params.id);
@@ -141,15 +179,13 @@ app.get('/api/location/:id', async (req, res) => {
 });
 
 app.delete('/api/location/:id', async (req, res) => {
-  const sessionData = await supabase.auth.getSession();
-
-  if (!sessionData.data.session) {
-    res.status(401).json({ error: 'Not logged in' });
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
     return;
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('location_requests')
       .delete()
       .eq('id', req.params.id);

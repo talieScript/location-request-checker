@@ -39,7 +39,7 @@
 </head>
 <body>
   <h2>Login Page</h2>
-  <form action="/login" method="post">
+  <form>
     <div class="container">
       <label for="uname"><b>Username</b></label>
       <input type="text" placeholder="Enter Username" name="uname" required>
@@ -52,27 +52,37 @@
   </form>
 
   <script>
-    document.querySelector('form').addEventListener('submit', function(e) {
+    document.querySelector('form').addEventListener('submit', async function(e) {
       e.preventDefault();
       const email = document.querySelector('input[name="uname"]').value;
       const password = document.querySelector('input[name="psw"]').value;
-      fetch('/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          alert(data.error);
-        } else {
-          localStorage.setItem('accessToken', data.session.access_token);
-          localStorage.setItem('user', data.user.id);
-          window.location.href = '/';
+
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          alert(data.error || 'Login failed');
+          return;
         }
-      });
+
+        if (!data.session?.access_token) {
+          alert('Login succeeded but no session was returned');
+          return;
+        }
+
+        localStorage.setItem('accessToken', data.session.access_token);
+        localStorage.setItem('user', data.user.id);
+        window.location.href = '/';
+      } catch (error) {
+        alert('Login failed: ' + error.message);
+      }
     });
   </script>
 </body>
