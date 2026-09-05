@@ -56,13 +56,23 @@ async function getAuthenticatedClient(req, res) {
 
 function formatLatlonForLocation(latlon) {
   const trimmed = String(latlon).trim();
+  let parts;
   if (trimmed.startsWith('[')) {
-    return JSON.parse(trimmed).join(',');
+    parts = JSON.parse(trimmed);
+  } else {
+    parts = trimmed.replace(/[\[\]]/g, '').split(',').map((s) => parseFloat(s.trim()));
   }
-  return trimmed.replace(/[\[\]]/g, '');
+  return parts.join(',');
 }
 
 app.use(express.static('public')); // Serve static files from the 'public' directory
+
+// Exposes client-safe config to the frontend. The Google Maps key is meant to
+// be used in the browser (Maps Embed API) and is locked down via HTTP
+// referrer restrictions in Google Cloud, not by keeping it server-side.
+app.get('/api/config', (req, res) => {
+  res.json({ googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || null });
+});
 
 app.get('/login', async function (req, res) {
   res.sendFile(__dirname + '/public/login.html');
@@ -116,6 +126,7 @@ app.post('/api/data', jsonParser, async (req, res) => {
       security: req.body.security || null,
       user_added: true,
       reviewer: auth.user.id,
+      added_by: req.body.added_by || null,
     });
     if (error) {
       throw error;

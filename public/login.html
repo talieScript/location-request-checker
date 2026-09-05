@@ -1,89 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Login Page</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in · Location Request Checker</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23FF6838' d='M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.4 7.3 11.6.2.2.5.3.7.3s.5-.1.7-.3C13 21.4 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    body {
-      font-family: Arial, Helvetica, sans-serif;
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
     }
-    .container {
-      width: 300px;
-      padding: 16px;
-      background-color: white;
-      margin: 0 auto;
-      margin-top: 100px;
-      border: 1px solid black;
-      border-radius: 4px;
-    }
-    input[type=text], input[type=password] {
-      padding: 15px;
-      margin: 5px 0 22px 0;
-      display: inline-block;
-      border: none;
-      background: #f1f1f1;
-    }
-    button {
-      background-color: #4CAF50;
-      color: white;
-      padding: 14px 20px;
-      margin: 8px 0;
-      border: none;
-      cursor: pointer;
+
+    .login-card {
       width: 100%;
-      opacity: 0.9;
+      max-width: 360px;
+      background: #fff;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      padding: 2rem 1.75rem 1.75rem;
     }
-    button:hover {
-      opacity:1;
+
+    .login-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .login-brand__mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.25rem;
+      height: 3.25rem;
+      border-radius: 1rem;
+      background: var(--color-primary-wash);
+      color: var(--color-primary);
+      margin-bottom: 0.875rem;
+    }
+
+    .login-brand__mark svg {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+
+    .login-brand__title {
+      font-family: var(--font-heading);
+      font-size: 1.375rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .login-brand__subtitle {
+      font-size: 0.875rem;
+      color: var(--color-medium);
+      margin: 0;
+    }
+
+    .login-footer {
+      text-align: center;
+      font-size: 0.8125rem;
+      color: var(--color-medium);
+      margin-top: 1.25rem;
     }
   </style>
 </head>
 <body>
-  <h2>Login Page</h2>
-  <form>
-    <div class="container">
-      <label for="uname"><b>Username</b></label>
-      <input type="text" placeholder="Enter Username" name="uname" required>
 
-      <label for="psw"><b>Password</b></label>
-      <input type="password" placeholder="Enter Password" name="psw" required>
-
-      <button type="submit">Login</button>
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand__mark">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill="currentColor" d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.4 7.3 11.6.2.2.5.3.7.3s.5-.1.7-.3C13 21.4 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
+        </svg>
+      </div>
+      <h1 class="login-brand__title">Location Checker</h1>
+      <p class="login-brand__subtitle">Sign in to review submitted parking spots</p>
     </div>
-  </form>
 
-  <script>
-    document.querySelector('form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const email = document.querySelector('input[name="uname"]').value;
-      const password = document.querySelector('input[name="psw"]').value;
+    <form id="login-form" novalidate>
+      <div class="field" id="email-field">
+        <input class="input" id="email" name="uname" type="email" placeholder=" " autocomplete="username" required>
+        <label for="email">Email</label>
+      </div>
 
-      try {
-        const res = await fetch('/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
+      <div class="field" id="password-field">
+        <input class="input" id="password" name="psw" type="password" placeholder=" " autocomplete="current-password" required>
+        <label for="password">Password</label>
+        <button class="field-toggle" type="button" id="toggle-password" aria-label="Show password">👁</button>
+      </div>
 
-        if (!res.ok || data.error) {
-          alert(data.error || 'Login failed');
-          return;
-        }
+      <div class="error-banner" id="error" role="alert"></div>
 
-        if (!data.session?.access_token) {
-          alert('Login succeeded but no session was returned');
-          return;
-        }
+      <button class="btn btn-primary btn-block btn-lg" type="submit" id="login-button">
+        <span id="login-button-text">Log in</span>
+      </button>
+    </form>
 
-        localStorage.setItem('accessToken', data.session.access_token);
-        localStorage.setItem('user', data.user.id);
-        window.location.href = '/';
-      } catch (error) {
-        alert('Login failed: ' + error.message);
+    <p class="login-footer">Kickstand · Internal review tool</p>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('login-form');
+  const errorEl = document.getElementById('error');
+  const loginButton = document.getElementById('login-button');
+  const loginButtonText = document.getElementById('login-button-text');
+  const passwordInput = document.getElementById('password');
+  const togglePassword = document.getElementById('toggle-password');
+
+  togglePassword.addEventListener('click', () => {
+    const showing = passwordInput.type === 'text';
+    passwordInput.type = showing ? 'password' : 'text';
+    togglePassword.textContent = showing ? '👁' : '🙈';
+    togglePassword.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  });
+
+  function setLoading(isLoading) {
+    loginButton.disabled = isLoading;
+    loginButtonText.textContent = isLoading ? 'Logging in…' : 'Log in';
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    errorEl.textContent = '';
+
+    const email = document.getElementById('email').value;
+    const password = passwordInput.value;
+
+    setLoading(true);
+    try {
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        errorEl.textContent = data.error || 'Login failed';
+        return;
       }
-    });
-  </script>
+
+      if (!data.session?.access_token) {
+        errorEl.textContent = 'Login succeeded but no session was returned';
+        return;
+      }
+
+      localStorage.setItem('accessToken', data.session.access_token);
+      localStorage.setItem('user', data.user.id);
+      window.location.href = '/';
+    } catch (error) {
+      errorEl.textContent = 'Login failed: ' + error.message;
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
 </body>
 </html>
