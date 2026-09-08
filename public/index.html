@@ -74,13 +74,16 @@
 
     .meta-card {
       display: flex;
-      gap: 1.5rem;
+      flex-wrap: wrap;
+      gap: 0.875rem 1.5rem;
     }
 
     .meta-row {
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+      flex: 1 1 auto;
+      min-width: 108px;
     }
 
     .meta-label {
@@ -202,7 +205,9 @@
 
     .map-modal-canvas-wrap {
       padding: 0.75rem;
-      overflow: hidden;
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .map-pair {
@@ -343,6 +348,10 @@
         <div class="meta-row">
           <span class="meta-label">Submitted</span>
           <span class="meta-value" id="created_at"></span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Added by</span>
+          <span class="meta-value" id="added-by">—</span>
         </div>
       </section>
 
@@ -490,6 +499,38 @@
     };
   }
 
+  let addedByRequestToken = 0;
+
+  async function updateAddedBy(location) {
+    const token = ++addedByRequestToken;
+    const addedByEl = document.getElementById('added-by');
+
+    if (!location.user_id) {
+      addedByEl.textContent = 'Unknown user';
+      return;
+    }
+
+    addedByEl.textContent = 'Loading…';
+
+    let username = null;
+    try {
+      const res = await fetch('/api/user/' + location.user_id, {
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        username = data.username || null;
+      }
+    } catch (error) {
+      console.error('Failed to fetch user', error);
+    }
+
+    if (token !== addedByRequestToken) {
+      return; // a newer location has since been shown; ignore this stale response
+    }
+    addedByEl.textContent = username || 'Unknown user';
+  }
+
   function formatLatlonForInput(latlon) {
     const trimmed = latlon.trim();
     if (trimmed.startsWith('[')) {
@@ -563,6 +604,16 @@
   const DESKTOP_QUERY = window.matchMedia('(min-width: 900px)');
   const DEFAULT_MAP_CENTER = [51.5074, -0.1278];
   const PIN_SVG = '<svg viewBox="0 0 24 24" width="30" height="30"><path fill="#FF6838" stroke="#fff" stroke-width="1.5" d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.4 7.3 11.6.2.2.5.3.7.3s.5-.1.7-.3C13 21.4 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>';
+  // This map is just a quick "does the pin look right" preview, not a tool for exploring
+  // the area — dragging/scroll-zoom/touch-zoom are disabled so a scroll or swipe over the
+  // map always scrolls the page/sheet instead of getting captured by the map (which was
+  // trapping users trying to scroll past it to reach the Street View panel below/beside it).
+  const MAP_PREVIEW_OPTIONS = {
+    dragging: false,
+    scrollWheelZoom: false,
+    touchZoom: false,
+    doubleClickZoom: false,
+  };
 
   let inlineMap = null;
   let inlineMarker = null;
@@ -603,7 +654,7 @@
       return;
     }
     try {
-      inlineMap = L.map('map-inline').setView(initialCoords || DEFAULT_MAP_CENTER, 16);
+      inlineMap = L.map('map-inline', MAP_PREVIEW_OPTIONS).setView(initialCoords || DEFAULT_MAP_CENTER, 16);
       addTilesTo(inlineMap);
       inlineMarker = L.marker(initialCoords || DEFAULT_MAP_CENTER, { icon: makePinIcon() }).addTo(inlineMap);
     } catch (e) {
@@ -621,7 +672,7 @@
       return;
     }
     try {
-      modalMap = L.map('map-modal').setView(initialCoords || DEFAULT_MAP_CENTER, 16);
+      modalMap = L.map('map-modal', MAP_PREVIEW_OPTIONS).setView(initialCoords || DEFAULT_MAP_CENTER, 16);
       addTilesTo(modalMap);
       modalMarker = L.marker(initialCoords || DEFAULT_MAP_CENTER, { icon: makePinIcon() }).addTo(modalMap);
     } catch (e) {
@@ -785,6 +836,7 @@
     console.log(location);
     document.getElementById('id').innerText = location.id;
     document.getElementById('created_at').innerText = formattedDate;
+    updateAddedBy(location); // fire-and-forget: never blocks the rest of the form from rendering
     document.getElementById('name').value = location.name;
     document.getElementById('security').value = location.security;
     document.getElementById('size').value = location.size || null;

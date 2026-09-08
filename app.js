@@ -92,6 +92,29 @@ app.post('/login', jsonParser, async (req, res) => {
   }
 });
 
+// API endpoint to look up the username of the person who submitted a request
+app.get('/api/user/:id', async (req, res) => {
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
+    return;
+  }
+
+  try {
+    const { data, error } = await auth.client
+      .from('profiles')
+      .select('username')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (error) {
+      throw error;
+    }
+    res.json({ username: data?.username || null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API endpoint to fetch data from the Supabase table
 app.get('/api/data', async (req, res) => {
   const auth = await getAuthenticatedClient(req, res);
