@@ -189,6 +189,64 @@ app.put('/api/data/:id', jsonParser, async (req, res) => {
   }
 });
 
+// Great-circle distance between two lat/lon points, in metres.
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// API endpoint to find existing map locations near a given point — used while reviewing
+// a request to flag likely duplicates as the coordinates are adjusted. The `location`
+// table only stores latlon as a plain "lat,lon" string with no spatial index, so this
+// fetches the (currently a few thousand rows) table and computes distance in JS rather
+// than filtering in SQL. Registered before /api/location/:id so "nearby" isn't swallowed
+// by that route's :id param.
+app.get('/api/location/nearby', async (req, res) => {
+  const auth = await getAuthenticatedClient(req, res);
+  if (!auth) {
+    return;
+  }
+
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  if (Number.isNaN(lat) || Number.isNaN(lon)) {
+    res.status(400).json({ error: 'lat and lon query params are required' });
+    return;
+  }
+  const parsedRadius = parseFloat(req.query.radius);
+  const radiusMeters = Number.isNaN(parsedRadius) ? 100 : parsedRadius;
+
+  try {
+    const { data, error } = await auth.client.from('location').select('id, name, latlon');
+    if (error) {
+      throw error;
+    }
+
+    const nearby = data
+      .filter((row) => row.id !== req.query.excludeId)
+      .map((row) => {
+        const [rowLat, rowLon] = String(row.latlon || '').split(',').map((s) => parseFloat(s.trim()));
+        if (Number.isNaN(rowLat) || Number.isNaN(rowLon)) {
+          return null;
+        }
+        return { id: row.id, name: row.name, latlon: row.latlon, distance: distanceMeters(lat, lon, rowLat, rowLon) };
+      })
+      .filter((row) => row && row.distance <= radiusMeters)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 10);
+
+    res.json(nearby);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API get location from id
 app.get('/api/location/:id', async (req, res) => {
   const auth = await getAuthenticatedClient(req, res);

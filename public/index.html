@@ -179,6 +179,7 @@
 
     .map-card__header .card__title {
       margin-bottom: 0;
+      flex: 1 1 auto;
     }
 
     .map-card__view-btn {
@@ -192,6 +193,34 @@
       border-radius: var(--radius-sm);
       overflow: hidden;
       background: var(--color-light);
+      box-shadow: 0 0 0 0 transparent;
+      transition: box-shadow 0.15s ease;
+    }
+
+    /* Scoped to the actual Leaflet containers (both also carry .map-canvas, but so
+       does the Street View iframe next to them, which should never look editable). */
+    #map-inline.is-editable,
+    #map-modal.is-editable {
+      box-shadow: 0 0 0 2px var(--color-primary);
+    }
+
+    .map-center-pin {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -100%);
+      z-index: 650;
+      pointer-events: none;
+      display: none;
+    }
+
+    .map-center-pin svg {
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+    }
+
+    #map-inline.is-editable .map-center-pin,
+    #map-modal.is-editable .map-center-pin {
+      display: block;
     }
 
     #map-banner .map-canvas {
@@ -311,7 +340,11 @@
 <main class="page" id="page-main">
   <div class="map-banner" id="map-banner">
     <div class="card">
-      <h2 class="card__title">Map preview</h2>
+      <div class="map-card__header">
+        <h2 class="card__title">Map preview</h2>
+        <button class="btn btn-text map-reset-btn hidden" type="button" onclick="resetMapEditPin()">↺ Reset</button>
+        <button class="btn btn-text map-edit-toggle" type="button" onclick="toggleMapEditMode()" aria-pressed="false">✏️ Edit</button>
+      </div>
       <div class="map-pair">
         <div id="map-inline" class="map-canvas"></div>
         <iframe id="streetview-inline" class="map-canvas streetview-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Street View"></iframe>
@@ -415,6 +448,11 @@
         </div>
       </section>
 
+      <section class="card hidden" id="nearby-locations-card">
+        <h2 class="card__title">⚠️ Nearby existing locations</h2>
+        <ul class="nearby-list" id="nearby-locations-list"></ul>
+      </section>
+
       <section class="card map-trigger-card">
         <div class="map-card__header">
           <h2 class="card__title">Map preview</h2>
@@ -462,6 +500,8 @@
   <div class="sheet__handle"></div>
   <div class="sheet__header">
     <h2 class="sheet__title">Map preview</h2>
+    <button class="btn btn-text map-reset-btn hidden" type="button" onclick="resetMapEditPin()">↺ Reset</button>
+    <button class="btn btn-text map-edit-toggle" type="button" onclick="toggleMapEditMode()" aria-pressed="false">✏️ Edit</button>
     <button class="btn-icon" type="button" onclick="closeMapModal()" aria-label="Close">✕</button>
   </div>
   <div class="map-modal-canvas-wrap">
@@ -601,9 +641,77 @@
     }, 500);
   }
 
+  function renderNearbyLocations(nearby) {
+    const card = document.getElementById('nearby-locations-card');
+    const list = document.getElementById('nearby-locations-list');
+    list.innerHTML = '';
+
+    if (!nearby || nearby.length === 0) {
+      card.classList.add('hidden');
+      return;
+    }
+    card.classList.remove('hidden');
+
+    nearby.forEach((loc) => {
+      const item = document.createElement('li');
+      item.className = 'nearby-list__item';
+      item.onclick = () => window.open(`https://www.google.com/maps/search/?api=1&query=${loc.latlon}`);
+
+      const distanceLabel = loc.distance < 1000
+        ? `${Math.round(loc.distance)} m`
+        : `${(loc.distance / 1000).toFixed(1)} km`;
+
+      item.innerHTML = `
+        <span class="nearby-list__name"></span>
+        <span class="nearby-list__distance">${distanceLabel} away</span>
+      `;
+      item.querySelector('.nearby-list__name').textContent = loc.name && loc.name.trim() ? loc.name : 'Untitled location';
+      list.appendChild(item);
+    });
+  }
+
+  // Flags likely duplicates by searching the already-published `location` table for
+  // anything close to the coordinates currently shown — called on every latlon change
+  // (typed, panned to, or a new request loading), debounced so it doesn't fire per
+  // keystroke or per pixel while dragging.
+  let nearbySearchDebounceTimer = null;
+  let nearbySearchToken = 0;
+  function searchNearbyLocations(coords, excludeId) {
+    clearTimeout(nearbySearchDebounceTimer);
+    if (!coords) {
+      renderNearbyLocations([]);
+      return;
+    }
+    nearbySearchDebounceTimer = setTimeout(async () => {
+      const token = ++nearbySearchToken;
+      try {
+        const params = new URLSearchParams({ lat: coords[0], lon: coords[1] });
+        if (excludeId) {
+          params.set('excludeId', excludeId);
+        }
+        const res = await fetch('/api/location/nearby?' + params.toString(), {
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          return;
+        }
+        const nearby = await res.json();
+        if (token !== nearbySearchToken) {
+          return; // a newer search has since started; ignore this stale response
+        }
+        renderNearbyLocations(nearby);
+      } catch (error) {
+        console.error('Failed to search nearby locations', error);
+      }
+    }, 500);
+  }
+
   const DESKTOP_QUERY = window.matchMedia('(min-width: 900px)');
   const DEFAULT_MAP_CENTER = [51.5074, -0.1278];
   const PIN_SVG = '<svg viewBox="0 0 24 24" width="30" height="30"><path fill="#FF6838" stroke="#fff" stroke-width="1.5" d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.4 7.3 11.6.2.2.5.3.7.3s.5-.1.7-.3C13 21.4 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>';
+  // Muted/smaller version of the pin used to mark where a location was before an edit,
+  // so it stays visible (and visually distinct from the live pick) while panning around.
+  const OLD_PIN_SVG = '<svg viewBox="0 0 24 24" width="24" height="24"><path fill="#92949c" stroke="#fff" stroke-width="1.5" d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.4 7.3 11.6.2.2.5.3.7.3s.5-.1.7-.3C13 21.4 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>';
   // This map is just a quick "does the pin look right" preview, not a tool for exploring
   // the area — dragging/scroll-zoom/touch-zoom are disabled so a scroll or swipe over the
   // map always scrolls the page/sheet instead of getting captured by the map (which was
@@ -620,6 +728,128 @@
   let modalMap = null;
   let modalMarker = null;
   let currentLatLon = null;
+  let mapEditMode = false;
+  let originalLatLon = null;
+  let inlineOriginalMarker = null;
+  let modalOriginalMarker = null;
+
+  // Applies the current edit-mode state to one Leaflet map/marker pair — called both
+  // when the mode is toggled and right after a map is lazily created, so a map built
+  // while edit mode is already on (e.g. crossing the desktop breakpoint mid-edit)
+  // still ends up interactive. Only the Leaflet map itself becomes draggable/zoomable —
+  // the Street View panel next to it is untouched. While editing, the real marker (which
+  // sits at the saved coordinates) is hidden in favor of the center-fixed pin added below.
+  function applyMapEditMode(map, marker) {
+    if (!map) {
+      return;
+    }
+    ['dragging', 'scrollWheelZoom', 'touchZoom', 'doubleClickZoom'].forEach((handler) => {
+      map[handler][mapEditMode ? 'enable' : 'disable']();
+    });
+    map.getContainer().classList.toggle('is-editable', mapEditMode);
+    if (marker) {
+      marker.setOpacity(mapEditMode ? 0 : 1);
+    }
+  }
+
+  // The edit-mode pin is fixed to the center of the map viewport via CSS (see
+  // .map-center-pin) rather than being a Leaflet marker bound to coordinates — panning
+  // the map underneath it is what changes the position, not dragging the pin itself.
+  function addCenterPin(map) {
+    const pin = document.createElement('div');
+    pin.className = 'map-center-pin';
+    pin.innerHTML = PIN_SVG;
+    map.getContainer().appendChild(pin);
+  }
+
+  // Drops a muted "old pin" at originalLatLon on one map — used while editing so the
+  // pre-edit position stays visible while panning around looking for the new one.
+  function showOriginalPin(map) {
+    if (!map || !originalLatLon) {
+      return null;
+    }
+    return L.marker(originalLatLon, { icon: makeOldPinIcon(), interactive: false }).addTo(map);
+  }
+
+  function removeOriginalPin(map, marker) {
+    if (map && marker) {
+      map.removeLayer(marker);
+    }
+  }
+
+  function handleMapMoveEnd(e) {
+    if (!mapEditMode) {
+      return;
+    }
+    const center = e.target.getCenter();
+    currentLatLon = [center.lat, center.lng];
+    document.getElementById('latlon').value = `${center.lat},${center.lng}`;
+    updateStreetView(currentLatLon); // debounced internally, safe to call on every stop
+    searchNearbyLocations(currentLatLon, locations?.[index]?.location_id);
+  }
+
+  // Recenters back to where the location was when editing started, discarding any
+  // panning done since — the old pin marker is left in place either way.
+  function resetMapEditPin() {
+    if (!mapEditMode || !originalLatLon) {
+      return;
+    }
+    if (inlineMap) {
+      inlineMap.setView(originalLatLon, 16);
+    }
+    if (modalMap) {
+      modalMap.setView(originalLatLon, 16);
+    }
+  }
+
+  // syncAfter controls whether turning editing off also re-syncs the map/marker/Street
+  // View to the current #latlon value (via updateMapPreview). That's right when the user
+  // is just exiting edit mode on the location they were editing, but wrong when we're
+  // resetting edit mode as part of navigating to a *different* location (showLocation) —
+  // at that point #latlon may still hold the previous location's panned-to value, and
+  // syncing against it would briefly show/commit the wrong location's position. Callers
+  // that reset for navigation pass syncAfter:false and do their own sync once the new
+  // location's fields are in place.
+  function setMapEditMode(enabled, syncAfter = true) {
+    const wasEnabled = mapEditMode;
+    mapEditMode = enabled;
+
+    if (!wasEnabled && enabled) {
+      originalLatLon = currentLatLon;
+      inlineOriginalMarker = showOriginalPin(inlineMap);
+      modalOriginalMarker = showOriginalPin(modalMap);
+    }
+
+    applyMapEditMode(inlineMap, inlineMarker);
+    applyMapEditMode(modalMap, modalMarker);
+
+    document.querySelectorAll('.map-edit-toggle').forEach((btn) => {
+      btn.classList.toggle('is-active', enabled);
+      btn.textContent = enabled ? '✓ Editing' : '✏️ Edit';
+      btn.setAttribute('aria-pressed', String(enabled));
+    });
+    document.querySelectorAll('.map-reset-btn').forEach((btn) => {
+      btn.classList.toggle('hidden', !enabled);
+    });
+
+    if (wasEnabled && !enabled) {
+      removeOriginalPin(inlineMap, inlineOriginalMarker);
+      removeOriginalPin(modalMap, modalOriginalMarker);
+      inlineOriginalMarker = null;
+      modalOriginalMarker = null;
+      originalLatLon = null;
+      if (!syncAfter) {
+        return;
+      }
+      // Editing just finished — sync the (now unhidden) marker(s) and Street View to
+      // whatever coordinates the user panned to.
+      updateMapPreview();
+    }
+  }
+
+  function toggleMapEditMode() {
+    setMapEditMode(!mapEditMode);
+  }
 
   function makePinIcon() {
     return L.divIcon({
@@ -627,6 +857,15 @@
       html: PIN_SVG,
       iconSize: [30, 30],
       iconAnchor: [15, 28],
+    });
+  }
+
+  function makeOldPinIcon() {
+    return L.divIcon({
+      className: 'map-pin-icon',
+      html: OLD_PIN_SVG,
+      iconSize: [24, 24],
+      iconAnchor: [12, 22],
     });
   }
 
@@ -657,6 +896,12 @@
       inlineMap = L.map('map-inline', MAP_PREVIEW_OPTIONS).setView(initialCoords || DEFAULT_MAP_CENTER, 16);
       addTilesTo(inlineMap);
       inlineMarker = L.marker(initialCoords || DEFAULT_MAP_CENTER, { icon: makePinIcon() }).addTo(inlineMap);
+      addCenterPin(inlineMap);
+      inlineMap.on('moveend', handleMapMoveEnd);
+      applyMapEditMode(inlineMap, inlineMarker);
+      if (mapEditMode) {
+        inlineOriginalMarker = showOriginalPin(inlineMap);
+      }
     } catch (e) {
       console.error('Failed to initialize inline map', e);
       showMapUnavailable('map-inline');
@@ -675,6 +920,12 @@
       modalMap = L.map('map-modal', MAP_PREVIEW_OPTIONS).setView(initialCoords || DEFAULT_MAP_CENTER, 16);
       addTilesTo(modalMap);
       modalMarker = L.marker(initialCoords || DEFAULT_MAP_CENTER, { icon: makePinIcon() }).addTo(modalMap);
+      addCenterPin(modalMap);
+      modalMap.on('moveend', handleMapMoveEnd);
+      applyMapEditMode(modalMap, modalMarker);
+      if (mapEditMode) {
+        modalOriginalMarker = showOriginalPin(modalMap);
+      }
     } catch (e) {
       console.error('Failed to initialize modal map', e);
       showMapUnavailable('map-modal');
@@ -706,6 +957,7 @@
     }
 
     updateStreetView(coords);
+    searchNearbyLocations(coords, locations?.[index]?.location_id);
   }
 
   DESKTOP_QUERY.addEventListener('change', () => {
@@ -736,6 +988,7 @@
     document.getElementById('map-backdrop').classList.remove('open');
     document.getElementById('map-sheet').classList.remove('open');
     document.body.classList.remove('sheet-open');
+    setMapEditMode(false);
   }
 
   document.getElementById('latlon').addEventListener('input', updateMapPreview);
@@ -780,15 +1033,20 @@
         item.type = 'button';
         item.className = 'list-item'
           + (i === index ? ' active' : '')
-          + (location.completed ? ' list-item--completed' : '');
+          + (location.completedAs ? ' list-item--completed' : '');
         item.onclick = () => jumpToLocation(i);
 
         const name = location.name && location.name.trim() ? location.name : 'Untitled request';
         const date = new Date(location.created_at).toLocaleDateString();
 
-        const badge = location.completed
-          ? '<span class="list-item__badge list-item__badge--added">Added</span>'
-          : (location.location_id ? '<span class="list-item__badge">On map</span>' : '');
+        let badge = '';
+        if (location.completedAs === 'added') {
+          badge = '<span class="list-item__badge list-item__badge--added">Added</span>';
+        } else if (location.completedAs === 'deleted') {
+          badge = '<span class="list-item__badge list-item__badge--deleted">Deleted</span>';
+        } else if (location.location_id) {
+          badge = '<span class="list-item__badge">On map</span>';
+        }
 
         item.innerHTML = `
           <span class="list-item__index">${i + 1}</span>
@@ -849,6 +1107,12 @@
     document.getElementById('type').value = location.type;
     document.getElementById('cost').value = location.cost;
     document.getElementById('latlon').value = formatLatlonForInput(location.latlon);
+
+    // Reset edit mode now that #latlon reflects the new location, not the previous one —
+    // syncAfter:false because the updateMapPreview() below (run after the fields for this
+    // location are fully settled) is what should do the actual syncing, not a stale read
+    // of whatever was in #latlon before we got here.
+    setMapEditMode(false, false);
 
     if (location.location_id) {
       document.getElementById('add-update-button').innerText = 'Update existing location on map';
@@ -918,6 +1182,7 @@
     if (confirmDelete) {
       try {
         await deleteLocationRequest(locations[index].id);
+        locations[index].completedAs = 'deleted';
         next(); // go to the next location
       } catch (error) {
         console.error(error);
@@ -973,7 +1238,7 @@
 
     try {
       await deleteLocationRequest(locations[index].id);
-      locations[index].completed = true;
+      locations[index].completedAs = 'added';
       next();
     } catch (error) {
       console.error(error);
