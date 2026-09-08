@@ -545,6 +545,16 @@ body.sheet-open {
   color: #0a90c4;
 }
 
+.list-item__badge--added {
+  background: rgba(45, 211, 111, 0.15);
+  color: #1a9c53;
+}
+
+.list-item--completed .list-item__name {
+  text-decoration: line-through;
+  color: var(--color-medium);
+}
+
 /* Utility */
 
 .hidden {

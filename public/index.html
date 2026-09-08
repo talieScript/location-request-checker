@@ -778,11 +778,17 @@
       locations.forEach((location, i) => {
         const item = document.createElement('button');
         item.type = 'button';
-        item.className = 'list-item' + (i === index ? ' active' : '');
+        item.className = 'list-item'
+          + (i === index ? ' active' : '')
+          + (location.completed ? ' list-item--completed' : '');
         item.onclick = () => jumpToLocation(i);
 
         const name = location.name && location.name.trim() ? location.name : 'Untitled request';
         const date = new Date(location.created_at).toLocaleDateString();
+
+        const badge = location.completed
+          ? '<span class="list-item__badge list-item__badge--added">Added</span>'
+          : (location.location_id ? '<span class="list-item__badge">On map</span>' : '');
 
         item.innerHTML = `
           <span class="list-item__index">${i + 1}</span>
@@ -790,7 +796,7 @@
             <span class="list-item__name"></span>
             <span class="list-item__meta">${date}</span>
           </span>
-          ${location.location_id ? '<span class="list-item__badge">On map</span>' : ''}
+          ${badge}
         `;
         item.querySelector('.list-item__name').textContent = name;
         listEl.appendChild(item);
@@ -893,15 +899,25 @@
     next();
   }
 
+  // Deletes a location request with no confirmation prompt of its own — used both by the
+  // manual "Delete request" button (which confirms first) and after a successful add
+  // (which was already confirmed by the "Add this location?" prompt).
+  async function deleteLocationRequest(id) {
+    const response = await fetch('/api/location/' + id, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'Failed to delete location request');
+    }
+  }
+
   async function deleteLocation() {
     const confirmDelete = confirm("Are you sure you want to delete this location request?");
     if (confirmDelete) {
       try {
-        const response = await fetch('/api/location/' + locations[index].id, {
-          method: 'DELETE',
-          headers: authHeaders(),
-        });
-        const result = await response.json();
+        await deleteLocationRequest(locations[index].id);
         next(); // go to the next location
       } catch (error) {
         console.error(error);
@@ -917,34 +933,52 @@
     }
 
     const confirmAdd = confirm("Are you sure you want to add this location?");
-    if (confirmAdd) {
-      const updatedLocation = {
-        name: document.getElementById('name').value,
-        security: document.getElementById('security').value,
-        size: document.getElementById('size').value,
-        type: document.getElementById('type').value,
-        cost: document.getElementById('cost').value,
-        latlon: formatLatlonForInput(document.getElementById('latlon').value),
-      };
-      if (!locations[index].location_id) {
-        updatedLocation.added_by = locations[index].user_id;
+    if (!confirmAdd) {
+      return;
+    }
+
+    const updatedLocation = {
+      name: document.getElementById('name').value,
+      security: document.getElementById('security').value,
+      size: document.getElementById('size').value,
+      type: document.getElementById('type').value,
+      cost: document.getElementById('cost').value,
+      latlon: formatLatlonForInput(document.getElementById('latlon').value),
+    };
+    if (!locations[index].location_id) {
+      updatedLocation.added_by = locations[index].user_id;
+    }
+
+    document.getElementById('error').innerHTML = '';
+    const endPoint = locations[index].location_id ? `/api/data/${locations[index].location_id}` : '/api/data';
+    const method = locations[index].location_id ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(endPoint, {
+        method,
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(updatedLocation),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add location');
       }
-      try {
-        const endPoint = locations[index].location_id ? `/api/data/${locations[index].location_id}` : '/api/data';
-        method = locations[index].location_id ? 'PUT' : 'POST';
-        const response = await fetch(endPoint, {
-          method,
-          headers: authHeaders({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify(updatedLocation),
-        });
-        const result = await response.json();
-        deleteLocation(); // delete the location request
-      } catch (error) {
-        console.error(error);
-        document.getElementById('error').innerHTML = error.message;
-      }
+    } catch (error) {
+      console.error(error);
+      document.getElementById('error').innerHTML = error.message;
+      return; // don't touch the original request unless the add actually succeeded
+    }
+
+    try {
+      await deleteLocationRequest(locations[index].id);
+      locations[index].completed = true;
+      next();
+    } catch (error) {
+      console.error(error);
+      document.getElementById('error').innerHTML =
+        'Location was added, but removing the original request failed: ' + error.message;
     }
   }
 
