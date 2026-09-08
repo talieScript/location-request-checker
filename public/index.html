@@ -397,11 +397,13 @@
             <input class="input" id="latlon" type="text" placeholder="lat, lon">
             <button class="btn-icon" type="button" onclick="openInGoogleMaps()" title="Open in Google Maps" aria-label="Open in Google Maps">🗺️</button>
           </div>
+          <span class="field-diff hidden" id="latlon-diff"></span>
         </div>
 
         <div class="field-group">
           <label for="name">🏷️ Name</label>
           <input class="input" id="name" type="text" required placeholder="e.g. Riverside café bike racks">
+          <span class="field-diff hidden" id="name-diff"></span>
         </div>
 
         <div class="field-row">
@@ -413,6 +415,7 @@
               <option value="NONE">None</option>
               <option value="">Unknown</option>
             </select>
+            <span class="field-diff hidden" id="security-diff"></span>
           </div>
           <div class="field-group">
             <label for="size">📏 Size</label>
@@ -423,6 +426,7 @@
               <option value="LG">8-10</option>
               <option value="XL">10+</option>
             </select>
+            <span class="field-diff hidden" id="size-diff"></span>
           </div>
         </div>
 
@@ -436,6 +440,7 @@
               <option value="off_road">Off road</option>
               <option value="bay">Bay</option>
             </select>
+            <span class="field-diff hidden" id="type-diff"></span>
           </div>
           <div class="field-group">
             <label for="cost">💰 Cost</label>
@@ -444,6 +449,7 @@
               <option value="paid">Paid</option>
               <option value="">Unknown</option>
             </select>
+            <span class="field-diff hidden" id="cost-diff"></span>
           </div>
         </div>
       </section>
@@ -1088,6 +1094,58 @@
     }
   });
 
+  // Fields compared between a request and the existing map entry it's proposing to
+  // change. selectId is set for the two <select> fields so their diff note can show the
+  // human-readable option label rather than the raw stored value (e.g. "Locking rail"
+  // instead of "LOCKING_RAIL").
+  const DIFF_FIELDS = [
+    { key: 'latlon', inputId: 'latlon', diffId: 'latlon-diff' },
+    { key: 'name', inputId: 'name', diffId: 'name-diff' },
+    { key: 'security', inputId: 'security', diffId: 'security-diff', selectId: 'security' },
+    { key: 'size', inputId: 'size', diffId: 'size-diff', selectId: 'size' },
+    { key: 'type', inputId: 'type', diffId: 'type-diff', selectId: 'type' },
+    { key: 'cost', inputId: 'cost', diffId: 'cost-diff', selectId: 'cost' },
+  ];
+
+  function normalizeFieldValue(key, value) {
+    if (key === 'latlon') {
+      const coords = parseLatLon(value);
+      return coords ? `${coords[0].toFixed(6)},${coords[1].toFixed(6)}` : '';
+    }
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  function optionLabel(selectId, value) {
+    const select = document.getElementById(selectId);
+    const normalized = value === null || value === undefined ? '' : String(value);
+    const option = Array.from(select.options).find((o) => o.value === normalized);
+    return option ? option.textContent : normalized || '(none)';
+  }
+
+  // Shows a "Was: X" note under any field whose value in the existing map entry differs
+  // from what this request is proposing — existingLocation is null for a brand new
+  // (not-yet-published) request, in which case there's nothing to diff against.
+  function renderFieldDiffs(existingLocation, request) {
+    DIFF_FIELDS.forEach(({ key, inputId, diffId, selectId }) => {
+      const diffEl = document.getElementById(diffId);
+      const inputEl = document.getElementById(inputId);
+
+      const oldValue = existingLocation ? normalizeFieldValue(key, existingLocation[key]) : null;
+      const newValue = normalizeFieldValue(key, request[key]);
+
+      if (oldValue === null || oldValue === newValue) {
+        diffEl.classList.add('hidden');
+        inputEl.classList.remove('input--changed');
+        return;
+      }
+
+      const displayOld = selectId ? optionLabel(selectId, existingLocation[key]) : (oldValue || '(empty)');
+      diffEl.textContent = `Was: ${displayOld}`;
+      diffEl.classList.remove('hidden');
+      inputEl.classList.add('input--changed');
+    });
+  }
+
   async function showLocation() {
     document.getElementById('error').innerHTML = '';
     updateProgress();
@@ -1122,7 +1180,9 @@
         const locationToUpdate = await fetch('/api/location/' + location.location_id, {
           headers: authHeaders(),
         });
-        document.getElementById('update-location').innerText = JSON.stringify(await locationToUpdate.json(), null, 2);
+        const existingLocation = await locationToUpdate.json();
+        document.getElementById('update-location').innerText = JSON.stringify(existingLocation, null, 2);
+        renderFieldDiffs(existingLocation, location);
       } catch (error) {
         console.error(error);
         document.getElementById('error').innerHTML = error.message;
@@ -1131,6 +1191,7 @@
       document.getElementById('add-update-button').innerText = 'Add location to map';
       document.getElementById('update-location').innerHTML = '';
       document.getElementById('existing-location-card').classList.add('hidden');
+      renderFieldDiffs(null, location);
     }
 
     updateMapPreview();
